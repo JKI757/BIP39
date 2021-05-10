@@ -119,7 +119,29 @@ public class Mnemonic {
         let hashbits = String(hash.flatMap { ("00000000" + String($0, radix:2)).suffix(8) })
         return String(hashbits.prefix(CS))
     }
-    
+    public static func getChecksumWordFromPhrase(_ phrase: [String], wordlist: [String] = Wordlists.english) throws -> String {
+        let bits = phrase.map { (word) -> String in
+            let index = wordlist.firstIndex(of: word)!
+            var str = String(index, radix:2)
+            while str.count < 11 {
+                str = "0" + str
+            }
+            return str
+        }.joined(separator: "")
+
+        let dividerIndex = Int(Double(bits.count / 33).rounded(.down) * 32)
+        let entropyBits = String(bits.prefix(dividerIndex))
+
+        let regex = try! NSRegularExpression(pattern: "[01]{1,8}", options: .caseInsensitive)
+        let entropyBytes = regex.matches(in: entropyBits, options: [], range: NSRange(location: 0, length: entropyBits.count)).map {
+            UInt8(strtoul(String(entropyBits[Range($0.range, in: entropyBits)!]), nil, 2))
+        }
+        let checksum = Mnemonic.deriveChecksumBits(entropyBytes);
+        //TODO: figure out exactly what is coming back from derivechecksum bits,
+        //then we need to convert that to bytes and then from there to a valid bip39 word
+        let l = Int(strtoul(checksum, nil, 2));
+        return wordlist[l];
+    }
     public var seed: [UInt8] {
         let mnemonic = self.phrase.joined(separator: " ")
         let salt = ("mnemonic" + self.passphrase)
